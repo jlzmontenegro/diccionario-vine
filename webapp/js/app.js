@@ -74,8 +74,8 @@
   };
   worker.postMessage({ type: 'init', base });
 
-  // PDF opcional (vine.pdf junto a la app)
-  fetch('vine.pdf', { method: 'HEAD' }).then((r) => { state.pdf = r.ok && /pdf/.test(r.headers.get('content-type') || ''); }).catch(() => {});
+  // PDF opcional (vine.pdf junto a la app); solo existe en el servidor local
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) fetch('vine.pdf', { method: 'HEAD' }).then((r) => { state.pdf = r.ok && /pdf/.test(r.headers.get('content-type') || ''); }).catch(() => {});
 
   // ---------------------------------------------------------------------------
   // Formato del cuerpo de un artículo
@@ -236,9 +236,10 @@
   // ---------------------------------------------------------------------------
   // Vistas
   // ---------------------------------------------------------------------------
+  // «Todo» reconoce citas, Strong, griego/hebreo y la sintaxis de texto completo
   const EXAMPLES = [
-    ['gracia', 'all'], ['ágape', 'orig'], ['λόγος', 'orig'], ['shalom', 'orig'], ['G26', 'orig'],
-    ['Jn 3:16', 'ref'], ['"nuevo nacimiento"', 'text'], ['redención -esclavo', 'text'], ['justific*', 'text'],
+    ['gracia', 'all'], ['ágape', 'all'], ['λόγος', 'all'], ['shalom', 'all'], ['G26', 'all'],
+    ['Jn 3:16', 'all'], ['"nuevo nacimiento"', 'text'], ['redención -esclavo', 'text'], ['justific*', 'text'],
   ];
 
   async function viewHome() {
@@ -269,7 +270,7 @@
         <div class="tip">α<div>Busca por <b>griego, hebreo o transliteración</b> (<code>agape</code>, <code>ἀγάπη</code>) o por <b>número Strong</b> (<code>G26</code>, <code>H7965</code>).</div></div>
         <div class="tip">📖<div><b>Cita bíblica</b>: <code>Jn 3:16</code>, <code>Romanos 8</code>, <code>1 Co 13</code> muestra los artículos que la comentan.</div></div>
         <div class="tip">🔎<div><b>Texto completo</b>: frase exacta <code>"pan de vida"</code>, excluir <code>-ley</code>, prefijo <code>salv*</code>.</div></div>
-        <div class="tip">⌨️<div>Atajos: <code>/</code> buscar, <code>↑ ↓</code> moverse, <code>Enter</code> abrir, <code>← →</code> artículo anterior/siguiente, <code>Esc</code> volver.</div></div>
+        <div class="tip tip-kbd">⌨️<div>Atajos: <code>/</code> buscar, <code>↑ ↓</code> moverse, <code>Enter</code> abrir, <code>← →</code> artículo anterior/siguiente, <code>Esc</code> volver.</div></div>
       </div>
       <p class="footer-note">Fuente: W. E. Vine, <i>Diccionario Expositivo de Palabras del Antiguo y del Nuevo Testamento Exhaustivo</i>, Editorial Caribe, 1999. Texto extraído automáticamente del PDF; puede contener errores de conversión.</p>`;
     const ch = $('#clearHist'); if (ch) ch.onclick = () => { state.hist = []; store.set('hist', []); viewHome(); };
@@ -359,7 +360,7 @@
       total += R.total;
       state.hlWords = [];
       if (R.invalid) {
-        parts.push(`<div class="empty">No reconozco «<b>${escHtml(q)}</b>» como cita. Prueba: <code>Jn 3:16</code>, <code>Romanos 8</code>, <code>1 Co 13:4</code>.</div>`);
+        parts.push(`<div class="empty">No reconozco «<b>${escHtml(q)}</b>» como cita. Prueba: <code>Jn 3:16</code>, <code>Romanos 8</code>, <code>1 Co 13:4</code>.<br><button class="btn primary" id="tryAll" style="margin-top:12px">Buscar «${escHtml(q)}» en Todo</button></div>`);
       } else {
         parts.push(`<div class="ref-banner"><span>📖</span><div><strong>${escHtml(R.ref.label)}</strong><div class="card-meta">${plural(R.total, 'artículo la cita', 'artículos la citan')}</div></div></div>`);
         const map = (it) => card(it.id, { snip: it.snip, meta: it.hits > 1 ? `${it.hits} menciones` : '' });
@@ -461,8 +462,11 @@
       </nav>`;
 
     // Misma palabra en el otro testamento
-    const other = state.index.findIndex((x, i) => i !== id && x.h === e.h);
-    if (other > -1) $('#otherT').innerHTML = `<div class="section-title">También en el ${state.index[other].t === 'AT' ? 'Antiguo' : 'Nuevo'} Testamento</div><ul class="results">${card(other)}</ul>`;
+    // El mismo término en el otro testamento (p. ej. PAZ ↔ «PAZ (TENER, ESTAR, VIVIR), PACÍFICO»)
+    const mainKey = (h) => norm(h.split(/[,;(]/)[0]).trim();
+    const key = mainKey(e.h);
+    const others = state.index.map((x, i) => i).filter((i) => i !== id && !state.index[i].n && state.index[i].t !== e.t && mainKey(state.index[i].h) === key);
+    if (others.length) $('#otherT').innerHTML = `<div class="section-title">También en el ${e.t === 'AT' ? 'Nuevo' : 'Antiguo'} Testamento</div><ul class="results">${others.slice(0, 3).map((i) => card(i)).join('')}</ul>`;
 
     // Resaltado de la búsqueda
     if (state.q && state.hlWords.length) {
@@ -539,7 +543,7 @@
     emptyReader();
     if (path.startsWith('/buscar')) {
       if (params.has('m')) setMode(params.get('m'));
-      setFilter(params.get('f') || state.filter);
+      setFilter(params.get('f') || '');
       if (params.has('q')) input.value = params.get('q');
       state.q = input.value.trim();
       $('#btnClear').hidden = !state.q;

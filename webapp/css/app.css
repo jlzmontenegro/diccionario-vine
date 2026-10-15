@@ -7,12 +7,12 @@
   --ink-2: #4a443d;
   --muted: #7a7168;
   --line: #e2dbcf;
-  --accent: #7a2630;
+  --accent: #2c6124;
   --accent-ink: #fff;
-  --accent-soft: #f3e3e3;
-  --gold: #a8741a;
-  --at: #2f6b4f;
-  --at-soft: #e1efe7;
+  --accent-soft: #e2eddc;
+  --gold: #9a6f1c;
+  --at: #8a5a12;
+  --at-soft: #f5e9d2;
   --nt: #2d5a8c;
   --nt-soft: #e2ebf6;
   --mark: #ffe59a;
@@ -29,15 +29,15 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #121315; --surface: #1a1c1f; --surface-2: #23262a; --ink: #ece8e2; --ink-2: #c9c3ba; --muted: #958d83;
-    --line: #2e3136; --accent: #e3949a; --accent-ink: #1a0d0f; --accent-soft: #3a2326; --gold: #d9ad5b;
-    --at: #7fcba4; --at-soft: #1f3329; --nt: #8db8ec; --nt-soft: #1d2a3b; --mark: #6b5414;
+    --line: #2e3136; --accent: #8fc77f; --accent-ink: #0d1a0a; --accent-soft: #1f3320; --gold: #dcbe7e;
+    --at: #e3b866; --at-soft: #3a2e17; --nt: #8db8ec; --nt-soft: #1d2a3b; --mark: #6b5414;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25); color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #121315; --surface: #1a1c1f; --surface-2: #23262a; --ink: #ece8e2; --ink-2: #c9c3ba; --muted: #958d83;
-  --line: #2e3136; --accent: #e3949a; --accent-ink: #1a0d0f; --accent-soft: #3a2326; --gold: #d9ad5b;
-  --at: #7fcba4; --at-soft: #1f3329; --nt: #8db8ec; --nt-soft: #1d2a3b; --mark: #6b5414;
+  --line: #2e3136; --accent: #8fc77f; --accent-ink: #0d1a0a; --accent-soft: #1f3320; --gold: #dcbe7e;
+  --at: #e3b866; --at-soft: #3a2e17; --nt: #8db8ec; --nt-soft: #1d2a3b; --mark: #6b5414;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25); color-scheme: dark;
 }
 
@@ -66,6 +66,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .brand-mark { width: 28px; height: 28px; color: var(--accent); stroke: none; }
 .brand b { font-family: var(--serif); font-size: 21px; letter-spacing: .3px; }
 .brand small { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+@media (max-width: 359px) { .brand small { display: none; } }
 .topbar-actions { display: flex; gap: 2px; }
 .icon-btn {
   display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 999px;
@@ -202,6 +203,7 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1
 .tips { display: grid; gap: 8px; }
 .tip { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: var(--ink-2); }
 .tip code, .kbdk { font: 600 13px var(--sans); background: var(--surface-2); padding: 2px 6px; border-radius: 6px; color: var(--ink); cursor: pointer; border: 0; }
+@media (hover: none) { .tip-kbd { display: none; } }
 .chipline { display: flex; flex-wrap: wrap; gap: 6px; }
 .chipline a, .chipline button {
   border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 12px;

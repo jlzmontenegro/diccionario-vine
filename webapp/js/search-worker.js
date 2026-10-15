@@ -123,7 +123,8 @@ function variantsOf(h) {
     const noPar = norm(part.replace(/\([^)]*\)/g, ' ')).replace(/[^a-zñ0-9 /]/g, ' ').replace(/\s+/g, ' ').trim();
     if (noPar) {
       out.add(noPar);
-      if (noPar.includes('/')) noPar.split('/').forEach(x => x.trim() && out.add(x.trim()));
+      // «ADÚLTERO/A» -> «adultero»; se ignoran sufijos sueltos como «a»
+      if (noPar.includes('/')) noPar.split('/').forEach(x => x.trim().length >= 3 && out.add(x.trim()));
     }
     const withPar = norm(part.replace(/[()]/g, ' ')).replace(/[^a-zñ0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
     if (withPar) out.add(withPar);
@@ -237,6 +238,9 @@ function findRanges(body, terms) {
   return ranges;
 }
 
+const NORM_CACHE = [];
+const normText = (id) => NORM_CACHE[id] || (NORM_CACHE[id] = norm(INDEX[id].h + ' ' + BODIES[id]));
+
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const B = '(^|[^a-zñ0-9\\u03b1-\\u03c9\\u05d0-\\u05ea])';
 
@@ -248,29 +252,50 @@ function searchHeads(q, filter, limit = 200, scope = 'all') {
   if (!nq) return { items: [] };
   const strong = q.trim().match(/^([GgHh])?\s?(\d{1,5})$/);
   const res = [];
+  // Una sola letra: lemas que empiezan por ella, en orden alfabético
+  if (nq.length === 1 && !strong) {
+    for (let id = 0; id < INDEX.length; id++) {
+      const e = INDEX[id];
+      if ((filter && e.t !== filter) || e.n) continue;
+      if (norm(e.h.replace(/^[^A-Za-zÁÉÍÓÚÑÜ]+/, '')).startsWith(nq)) res.push({ id, score: 50, why: '' });
+    }
+    return { items: res.slice(0, limit), total: res.length, suggestion: null };
+  }
   for (let id = 0; id < INDEX.length; id++) {
     const e = INDEX[id];
     if (filter && e.t !== filter) continue;
     const H = HEADS[id];
     let best = 0, why = '';
     if (strong) {
-      for (const w of H.w) {
-        if (strong[1] ? w.s === (strong[1].toLowerCase() + strong[2]) : w.n === strong[2]) { best = 100; why = w.s.toUpperCase() + ' · ' + INDEX[id].w[H.w.indexOf(w)].tr; break; }
+      for (let k = 0; k < H.w.length; k++) {
+        const w = H.w[k];
+        if (strong[1] ? w.s === (strong[1].toLowerCase() + strong[2]) : w.n === strong[2]) {
+          // el artículo donde la palabra encabeza la lista es el principal
+          best = 100 + (k === 0 ? 4 : k < 3 ? 2 : 0); why = w.s.toUpperCase() + ' · ' + e.w[k].tr; break;
+        }
       }
     } else {
+      const qWords = nq.split(' ');
       if (scope !== 'orig') for (const v of H.v) {
         let s = 0;
         if (v === nq) s = 100;
         else if (v.startsWith(nq)) s = 85 - Math.min(20, (v.length - nq.length) * 0.5);
         else if ((' ' + v).includes(' ' + nq)) s = 60;
         else if (nq.length >= 3 && v.includes(nq)) s = 35;
+        else if (qWords.length > 1) {
+          // varias palabras: todas deben empezar alguna palabra del lema
+          const vw = v.split(' ');
+          const hits = qWords.filter(q => vw.some(x => x.startsWith(q))).length;
+          if (hits === qWords.length) s = 55;
+          else if (hits && vw.some(x => x === qWords[0])) s = 40 + hits * 2;
+        }
         if (s > best) best = s;
       }
       if (scope !== 'heads') for (let k = 0; k < H.w.length; k++) {
         const w = H.w[k];
         let s = 0;
         if (w.tr === nq || w.o === nq) s = 92;
-        else if (nq.length >= 2 && (w.tr.startsWith(nq) || w.o.startsWith(nq))) s = 70 - Math.min(15, (w.tr.length - nq.length));
+        else if (nq.length >= 3 && (w.tr.startsWith(nq) || w.o.startsWith(nq))) s = 70 - Math.min(15, (w.tr.length - nq.length));
         else if (nq.length >= 5 && (w.tr.includes(nq) || w.o.includes(nq))) s = 30;
         if (s) s += k === 0 ? 4 : k < 3 ? 2 : 0;
         if (s > best || (s && s === best && !why)) {
@@ -279,7 +304,7 @@ function searchHeads(q, filter, limit = 200, scope = 'all') {
         }
       }
     }
-    if (best > 0) res.push({ id, score: best + (e.n ? -5 : 0) + Math.log10(BODIES[id].length + 10), why });
+    if (best > 0) res.push({ id, score: best + (e.n ? -5 : 0) + 0.3 * Math.log10(BODIES[id].length + 10), why });
   }
   res.sort((a, b) => b.score - a.score || a.id - b.id);
 
@@ -371,7 +396,7 @@ function searchText(q, filter, limit = 150) {
       }
       const phraseRe = new RegExp(B + t.phrase.map(esc).join('[^a-zñ0-9\\u03b1-\\u03c9\\u05d0-\\u05ea]+') + '(?![a-zñ0-9])', 'g');
       for (const [id] of cand || []) {
-        const txt = norm(INDEX[id].h + ' ' + BODIES[id]);
+        const txt = normText(id);
         phraseRe.lastIndex = 0;
         const c = (txt.match(phraseRe) || []).length;
         if (c) local.set(id, (1 + Math.log(c)) * 4);
@@ -384,7 +409,7 @@ function searchText(q, filter, limit = 150) {
   for (const t of terms.filter(t => t.neg)) {
     const words = t.word ? expandWord(t) : null;
     for (const id of [...scores.keys()]) {
-      const txt = norm(INDEX[id].h + ' ' + BODIES[id]);
+      const txt = normText(id);
       const hit = words ? words.some(w => VOCAB.get(w) && VOCAB.get(w).has(id)) : txt.includes(t.phrase.join(' '));
       if (hit) scores.delete(id);
     }
@@ -399,6 +424,15 @@ function searchText(q, filter, limit = 150) {
     items.push({ id, score: sc });
   }
   items.sort((a, b) => b.score - a.score);
+  // Varias palabras sin comillas: premia los artículos donde aparecen juntas
+  if (nqWords.length > 1 && nqWords.length === pos.length) {
+    const near = new RegExp(B + nqWords.map(esc).join('[^a-zñ0-9\\u03b1-\\u03c9\\u05d0-\\u05ea]+'), 'g');
+    for (const it of items.slice(0, 400)) {
+      const c = (normText(it.id).match(near) || []).length;
+      if (c) it.score *= 2 + Math.log(1 + c);
+    }
+    items.sort((a, b) => b.score - a.score);
+  }
   const total = items.length;
   items = items.slice(0, limit);
   for (const it of items.slice(0, 60)) {
