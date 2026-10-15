@@ -1,5 +1,5 @@
 /* Service worker: funciona sin conexión tras la primera visita */
-const VERSION = 'vine-v2';
+const VERSION = 'vine-v3';
 const CORE = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/search-worker.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'data/index.json', 'data/bodies.json'];
 

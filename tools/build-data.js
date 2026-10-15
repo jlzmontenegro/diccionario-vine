@@ -40,7 +40,7 @@ const VERSION_NAMES = [
   'Reina Valera \\(revisión de 1909\\)', 'Reina Valera \\(revisión de 1977\\)', 'La Biblia al día(?:<\\$IDía>)? \\(1979\\)',
   'Nueva Versión Internacional \\(1995\\)', 'Santa Biblia \\(Paulinas\\)', 'King James Version \\(1945\\)',
   'Biblia Bover-Cantera \\(1953\\)', 'Sagrada Biblia \\(Herder \\(1963\\)\\)?', 'Versión Moderna de H\\.B\\. Pratt \\(revisión de 1923\\)',
-  'Versión Hispanoamericana', 'Textus Receptus', 'Septuaginta', 'Dios Habla Hoy[^)]*?\\(\\d{4}\\)',
+  'Versión Hispanoamericana', 'Nueva Biblia Española \\(Cristiandad; 1975\\)', 'Textus Receptus', 'Septuaginta', 'Dios Habla Hoy[^)]*?\\(\\d{4}\\)',
 ];
 const FOOT_RE = new RegExp('(?:^|\\s)(?:\\S{1,8} )?(?:' + VERSION_NAMES.join('|') + ')', 'g');
 const MARK_NOTES = [
@@ -88,7 +88,14 @@ function isHeadword(line) {
   return letters.length >= 2;
 }
 
-const END_OK = /[.»)¶!?:\]”;"'’†\d]$/;
+// Línea de referencia cruzada completa: "Véanse SANAR, SANIDAD, SANO"
+const XREF_END = /^(?:V[eé][aá]n?se)\b.*[A-ZÁÉÍÓÚÑÜ)]$/;
+// La línea siguiente parece el comienzo de un artículo
+function looksLikeStart(l) {
+  return SUB_RE.test(l) || SUB2_RE.test(l) || /^V[eé][aá]n?se /.test(l) || /^Notas?(?: \(\d\))?:/.test(l) ||
+    /^\d{1,2}\. \S+(?: o \S+)? \(/.test(l) || /^[^\s(]+(?: o [^\s(]+)? \([^)]*[Ͱ-Ͽἀ-῿֐-׿]/.test(l);
+}
+const END_OK =/[.»)¶!?:\]”;"'’†\d]$/;
 
 function parse(text) {
   const pages = text.replace(/\r/g, '').split('\f');
@@ -99,23 +106,31 @@ function parse(text) {
   let started = { AT: false, NT: false };
 
   const flush = () => {
-    if (cur && cur.lines.length) entries.push(cur);
+    if (cur && !cur.lines.length && !cur.note) cur.lines.push('(El original no incluye texto para este término.)');
+    if (cur) entries.push(cur);
     cur = null;
   };
 
+  // Primera pasada: líneas limpias con su página
+  const items = [];
   for (let pi = 0; pi < pages.length; pi++) {
-    const lines = pages[pi].split('\n');
-    for (let raw of lines) {
+    for (const raw of pages[pi].split('\n')) {
       let line = raw.trim();
-      if (!line) continue;
-      if (isFootnote(line)) continue;
+      if (!line || isFootnote(line)) continue;
       line = fixHebrew(line);
       for (const re of MARK_NOTES) line = line.replace(re, '').trim();
-      if (!line) continue;
+      if (line) items.push({ line, pi });
+    }
+  }
+
+  for (let k = 0; k < items.length; k++) {
+    {
+      const { line, pi } = items[k];
+      const next = items[k + 1] ? items[k + 1].line : '';
 
       // Secciones
       if (section === null && line === 'ABANDONAR, DEJAR') { section = 'AT'; }
-      if (line === 'Santiago Escuain.' || (section === 'AT' && line === 'PREFACIO DE LOS EDITORES')) { flush(); section = 'NT-pre'; continue; }
+      if (line === 'Santiago Escuain.' || (section === 'AT' && (line === 'PREFACIO DE LOS EDITORES' || line.startsWith('DICCIONARIO EXPOSITIVO DE PALABRAS DEL NUEVO')))) { flush(); section = 'NT-pre'; continue; }
       if (section === 'NT-pre' && line === 'ABAJO') { section = 'NT'; }
       if (section === 'NT' && line === 'Notas Adicionales') { flush(); section = 'NOTAS'; prevContent = ''; continue; }
       if (section === null || section === 'NT-pre') continue;
@@ -135,7 +150,7 @@ function parse(text) {
 
       if (LETTER_RE.test(line)) { prevContent = line; continue; }
 
-      if (isHeadword(line) && (!cur || cur.lines.length === 0 || END_OK.test(prevContent) || LETTER_RE.test(prevContent))) {
+      if (isHeadword(line) && (!cur || cur.lines.length === 0 || END_OK.test(prevContent) || LETTER_RE.test(prevContent) || XREF_END.test(prevContent) || looksLikeStart(next))) {
         flush();
         cur = { h: line, t: section, p: pi + 1, lines: [] };
         prevContent = line;
