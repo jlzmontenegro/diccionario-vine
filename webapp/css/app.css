@@ -95,7 +95,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .filters { display: flex; flex-direction: column; gap: 8px; padding-bottom: 10px; }
 .chips {
   display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x proximity; scroll-padding-inline: 16px;
 }
 .chips::-webkit-scrollbar { display: none; }
 .chips button {
