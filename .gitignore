@@ -1,0 +1,4 @@
+# El PDF original no se publica
+*.pdf
+node_modules/
+.claude/
